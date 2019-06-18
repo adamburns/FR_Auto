@@ -2,12 +2,12 @@ import xlrd
 import pandas as pd
 
 #TODO(Adam): Add a file to read in
-monthly = ("Source Doc. - Report Costs for FactRight Tab of March Financial Review.xlsx")
+monthly = ('Source Doc. - Report Costs for FactRight Tab of March Financial Review.xlsx')
 
 wb = xlrd.open_workbook(monthly)
 #open the first sheet in the workbook
 sheet = wb.sheet_by_index(1)
-print(sheet)
+print([sheet.cell(0, col_index).value for col_index in range(sheet.ncols) if sheet.cell(0, col_index).value])
 
 
 def check_child_node(sheet, loc):
@@ -35,15 +35,24 @@ def check_neutral_node(sheet, loc):
     return True
 
 
-def check_next_node(sheet, loc):
+def check_data_node(sheet, loc, cols):
+    data = [sheet.cell(loc[0]+1, col).value for col in cols if sheet.cell(loc[0]+1, col).value]
+    if not data:
+        return False
+    return True
+
+
+def check_next_node(sheet, loc, cols):
     if check_child_node(sheet, loc):
         return 1
     elif check_closing_node(sheet, loc):
         return 2
     elif check_neutral_node(sheet, loc):
         return 3
-    else:
+    elif check_data_node(sheet, loc, cols):
         return 4
+    else:
+        return 5
 
 
 def get_next_node(arg, loc):
@@ -51,7 +60,7 @@ def get_next_node(arg, loc):
         return [loc[0] + 1, loc[1] + 1]
     if arg == 2:
         return [loc[0] + 1, loc[1] - 1]
-    if arg == 3:
+    if arg in {3, 4}:
         return [loc[0] + 1, loc[1]]
 
 
@@ -63,13 +72,10 @@ def max_cols(sheet):
     return sheet.ncols
 
 
-def get_cols(sheet, loc):
-    cols = []
-    while(loc[1] < max_cols(sheet)):
-        if not sheet.cell_value(0, loc[1]):
-            loc[1] += 1
-            continue
-        cols.append(loc[1])
+def get_cols(sheet):
+    cols = [col_index for col_index in range(sheet.ncols) if sheet.cell(0, col_index).value]
+    print('test')
+    print(cols)
     return cols
 
 
@@ -92,29 +98,51 @@ def get_account(sheet, loc):
     return current_account
 
 
-def scan_across_doc(sheet, loc, cols, df, account):
-    
+def check_account_total(sheet, loc):
+    current_account = sheet.cell_value(loc[0], loc[1]).split(" ")[0]
+    if current_account is 'Total':
+        return True
+    return False
+
+
+def scan_across_doc(sheet, loc, cols, headers, account):
+    col_vals = [account] + [sheet.cell_value(loc[0], col) for col in cols]
+    print(headers)
+    print(col_vals)
+    col_vals = [col_vals]
+    df = pd.DataFrame(col_vals, columns=headers)
+    print(df)
+    return df
 
 
 def scan_down_doc(sheet):
+    print(max_rows(sheet))
     cursor = [0, 0]
-    cols = get_cols(sheet, cursor)
-    headers = ['Account'] + get_headers()
+    cols = get_cols(sheet)
+    headers = ['Account'] + get_headers(sheet, cols)
     df = pd.DataFrame(columns=headers)
-    
-    while(cursor[0] < max_rows(sheet)):        
-        next_node = check_next_node(sheet, cursor)
+    account = 0
+    while(cursor[0] < max_rows(sheet) - 1):      
+        print(str(cursor[0]) + '/' + str(max_rows(sheet)))  
+        next_node = check_next_node(sheet, cursor, cols)
+        print(next_node)
         if next_node == 1:
             #Get parent node and add to tree
+            if not check_data_node(sheet, cursor, cols):
+                cursor = get_next_node(next_node, cursor)
+                if check_account(sheet, cursor):
+                    account = get_account(sheet, cursor)
+                continue
+        elif next_node in {2, 3}:
+            if check_account_total(sheet, cursor):
+                account = 0
             cursor = get_next_node(next_node, cursor)
-            if check_account(sheet, cursor):
-                account = get_account(sheet, cursor)
-                scan_across_doc(sheet, cursor, cols, df, account)
-        if next_node == 2 or next_node == 3:
+        elif next_node == 4:
             cursor = get_next_node(next_node, cursor)
-        if next_node == 4:
-            break
+            df = df.append(scan_across_doc(sheet, cursor, cols, headers, account))
+        else:
+            return df
+    return df
 
 
-def scan_across_doc(sheet, loc, df, account)
-    #given get_cols(), use those data points with the current row and add that to the df    
+print(scan_down_doc(sheet))
