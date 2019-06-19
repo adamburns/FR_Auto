@@ -1,4 +1,4 @@
-# FactRight Automation
+# FactRight Financial Automation
 
 ## Requirements
 * Python 3.x
