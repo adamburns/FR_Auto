@@ -1,7 +1,9 @@
 # FactRight Automation
 
 ## Requirements
-
+* Python 3.x
+    * xlrd
+    * pandas
 ## Functions
 
 ### parse_rc.py
