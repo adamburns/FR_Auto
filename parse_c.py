@@ -11,7 +11,7 @@ monthly = ('Source Doc. - Final Consolidated Financials March 2019.xlsx')
 
 wb = xlrd.open_workbook(monthly)
 #open the first sheet in the workbook
-sheet = wb.sheet_by_index(0)
+sheet = wb.sheet_by_index(2)
 print([sheet.cell(0, col_index).value for col_index in range(sheet.ncols) if sheet.cell(0, col_index).value])
 
 
@@ -47,6 +47,12 @@ def check_data_node(sheet, loc, cols):
     return True
 
 
+def check_offset_node(sheet, loc):
+    if not sheet.cell_value(loc[0] + 1, loc[1] + 2):
+        return False
+    return True
+
+
 def check_next_node(sheet, loc, cols):
     if check_closing_node(sheet, loc):
         return 2
@@ -56,6 +62,8 @@ def check_next_node(sheet, loc, cols):
         return 1
     elif check_data_node(sheet, loc, cols):
         return 4
+    elif check_offset_node(sheet, loc):
+        return 6
     else:
         return 5
 
@@ -67,6 +75,8 @@ def get_next_node(arg, loc):
         return [loc[0] + 1, loc[1] - 1]
     if arg in {3, 4}:
         return [loc[0] + 1, loc[1]]
+    if arg == 6:
+        return [loc[0] + 1, loc[1] + 2]
 
 
 def max_rows(sheet):
@@ -134,18 +144,17 @@ def scan_down_doc(sheet):
         print(next_node)
         if next_node == 1:
             #Get parent node and add to tree
+            cursor = get_next_node(next_node, cursor)
             if not check_data_node(sheet, cursor, cols):
                 cursor = get_next_node(next_node, cursor)
                 if check_account(sheet, cursor):
                     account = get_account(sheet, cursor)
                 continue
+            if check_account(sheet, cursor):
+                account = get_account(sheet, cursor)
+                df = df.append(scan_across_doc(sheet, cursor, cols, headers, account))
             else:
-                cursor = get_next_node(next_node, cursor)
-                if check_account(sheet, cursor):
-                    account = get_account(sheet, cursor)
-                    df = df.append(scan_across_doc(sheet, cursor, cols, headers, account))
-                else:
-                    continue
+                continue
         elif next_node == 2:
             if check_account_total(sheet, cursor):
                 account = 0
@@ -157,10 +166,15 @@ def scan_down_doc(sheet):
                     account = get_account(sheet, cursor)
                 continue
             cursor = get_next_node(next_node, cursor)
-            df = df.append(scan_across_doc(sheet, cursor, cols, headers, account))
+            if check_account(sheet, cursor):
+                account = get_account(sheet, cursor)
+                df = df.append(scan_across_doc(sheet, cursor, cols, headers, account))
+            else:
+                continue
         elif next_node == 4:
             cursor = get_next_node(next_node, cursor)
-            df = df.append(scan_across_doc(sheet, cursor, cols, headers, account))
+        elif next_node == 6:
+            cursor = get_next_node(next_node, cursor)
         else:
             return df
     return df
