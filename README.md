@@ -12,3 +12,5 @@ This function parses information with the file format *'Report Revenue/Costs for
 ### parse_c.py
 This function parses information with the file format *'Final Consolidated Financials MMMM YYYY.xlsx'*
 
+### parse_b.py
+This function parses information with the file format *'Budget Template -YYYY'*
